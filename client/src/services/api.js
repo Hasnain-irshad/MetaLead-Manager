@@ -4,8 +4,41 @@ const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:4000';
 
 // --- Auth ---
 export async function login(email, password) {
-  const res = await axios.post(`${API_BASE}/api/auth/login`, { email, password });
-  return res.data;
+  try {
+    const res = await axios.post(`${API_BASE}/api/auth/login`, { email, password });
+    const data = res.data;
+
+    // Validate expected response shape
+    if (data && data.success && data.user) {
+      return { success: true, user: data.user };
+    }
+
+    // Backend returned 200 but unexpected shape
+    return {
+      success: false,
+      error: data?.error || 'Unexpected response from server.',
+    };
+  } catch (err) {
+    // HTTP error response from backend (4xx / 5xx)
+    if (err.response) {
+      const msg =
+        err.response.data?.error ||
+        err.response.data?.message ||
+        `Login failed (${err.response.status}).`;
+      return { success: false, error: msg };
+    }
+
+    // Network / timeout error
+    if (err.request) {
+      return {
+        success: false,
+        error: 'Cannot reach the server. Please check your connection.',
+      };
+    }
+
+    // Anything else
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
 }
 
 // --- Admin APIs ---

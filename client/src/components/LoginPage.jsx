@@ -16,18 +16,15 @@ export default function LoginPage({ onLogin }) {
         setError('');
         setLoading(true);
 
-        try {
-            const data = await api.login(email, password);
-            if (data.success && data.user) {
-                onLogin(data.user);
-            } else {
-                setError('Login failed. Please check your credentials.');
-            }
-        } catch (err) {
-            setError(err.response?.data?.error || 'Server error. Please try again.');
-        } finally {
-            setLoading(false);
+        const result = await api.login(email, password);
+
+        if (result.success && result.user) {
+            onLogin(result.user);
+        } else {
+            setError(result.error || 'Login failed. Please check your credentials.');
         }
+
+        setLoading(false);
     }
 
     return (
