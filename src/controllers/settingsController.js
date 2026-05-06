@@ -63,7 +63,7 @@ async function updateGlobalSettings(req, res) {
  */
 async function changeAdminPassword(req, res) {
     try {
-        const { email, oldPassword, newPassword } = req.body;
+        const { email, oldPassword, newPassword, newEmail, newName } = req.body;
         if (!email || !oldPassword || !newPassword) {
             return res.status(400).json({ error: 'email, oldPassword, and newPassword are required' });
         }
@@ -71,17 +71,115 @@ async function changeAdminPassword(req, res) {
         const admin = await User.findOne({ email, role: 'admin' });
         if (!admin) return res.status(404).json({ error: 'Admin not found' });
 
-        const isMatch = await admin.comparePassword(oldPassword);
+        // Support both bcrypt-hashed and legacy-plaintext passwords.
+        let isMatch = false;
+        try {
+            if (admin.password && admin.password.startsWith && admin.password.startsWith('$2')) {
+                isMatch = await admin.comparePassword(oldPassword);
+            } else {
+                // legacy plaintext
+                isMatch = admin.password === oldPassword;
+            }
+        } catch (e) {
+            isMatch = false;
+        }
+
         if (!isMatch) return res.status(401).json({ error: 'Current password is incorrect' });
 
-        admin.password = newPassword;  // pre-save hook will hash it
+        // Allow updating email/name together with password if provided
+        if (newEmail && newEmail !== admin.email) {
+            const exists = await User.findOne({ email: newEmail });
+            if (exists && String(exists._id) !== String(admin._id)) {
+                return res.status(400).json({ error: 'Email already in use' });
+            }
+            admin.email = newEmail;
+        }
+        if (newName) admin.name = newName;
+
+        admin.password = newPassword; // pre-save hook will hash if necessary
         await admin.save();
 
-        console.info('[settingsController][changeAdminPassword] Admin password updated');
-        res.json({ success: true, message: 'Password updated successfully' });
+        console.info('[settingsController][changeAdminPassword] Admin password/email/name updated');
+
+        const userInfo = {
+            id: admin._id,
+            name: admin.name,
+            email: admin.email,
+            role: admin.role
+        };
+
+        res.json({ success: true, message: 'Password updated successfully', user: userInfo });
     } catch (err) {
         console.error('[settingsController][changeAdminPassword]', err.message);
         res.status(500).json({ error: 'Failed to change password' });
+    }
+}
+
+/**
+ * GET /api/token-status
+ * Check Facebook token expiry status.
+ * Assumes tokens expire after 60 days.
+ */
+async function getTokenStatus(req, res) {
+    try {
+        const settings = await getOrCreateSettings();
+        
+        if (!settings.token_created_at) {
+            return res.json({
+                daysRemaining: null,
+                isExpiringSoon: false,
+                message: 'Token creation date not set'
+            });
+        }
+
+        const createdDate = new Date(settings.token_created_at);
+        const expiryDate = new Date(createdDate.getTime() + 60 * 24 * 60 * 60 * 1000); // 60 days
+        const now = new Date();
+        
+        const daysRemaining = Math.ceil((expiryDate - now) / (24 * 60 * 60 * 1000));
+        const isExpiringSoon = daysRemaining <= 10; // Warning if 10 days or less
+        
+        const isExpired = daysRemaining < 0;
+
+        res.json({
+            daysRemaining: Math.max(daysRemaining, 0),
+            isExpiringSoon: !isExpired && isExpiringSoon,
+            isExpired,
+            tokenCreatedAt: createdDate.toISOString()
+        });
+    } catch (err) {
+        console.error('[settingsController][getTokenStatus]', err.message);
+        res.status(500).json({ error: 'Failed to check token status' });
+    }
+}
+
+/**
+ * PUT /api/token-created-at
+ * Update token creation timestamp (admin only).
+ * Body: { token_created_at: ISO date string OR null }
+ */
+async function setTokenCreatedAt(req, res) {
+    try {
+        const { token_created_at } = req.body;
+        
+        let settings = await getOrCreateSettings();
+        
+        if (token_created_at === null) {
+            settings.token_created_at = null;
+        } else if (typeof token_created_at === 'string') {
+            settings.token_created_at = new Date(token_created_at);
+        } else {
+            // Set to now
+            settings.token_created_at = new Date();
+        }
+        
+        await settings.save();
+        
+        console.info('[settingsController][setTokenCreatedAt] Token timestamp updated');
+        res.json({ success: true, token_created_at: settings.token_created_at });
+    } catch (err) {
+        console.error('[settingsController][setTokenCreatedAt]', err.message);
+        res.status(500).json({ error: 'Failed to update token timestamp' });
     }
 }
 
@@ -237,7 +335,18 @@ async function changeAgentPassword(req, res) {
         const agent = await User.findById(agentId);
         if (!agent) return res.status(404).json({ error: 'Agent not found' });
 
-        const isMatch = await agent.comparePassword(oldPassword);
+        // Support both bcrypt-hashed and legacy-plaintext passwords.
+        let isMatch = false;
+        try {
+            if (agent.password && agent.password.startsWith && agent.password.startsWith('$2')) {
+                isMatch = await agent.comparePassword(oldPassword);
+            } else {
+                isMatch = agent.password === oldPassword;
+            }
+        } catch (e) {
+            isMatch = false;
+        }
+
         if (!isMatch) return res.status(401).json({ error: 'Current password is incorrect' });
 
         agent.password = newPassword;
@@ -255,6 +364,8 @@ module.exports = {
     getGlobalSettings,
     updateGlobalSettings,
     changeAdminPassword,
+    getTokenStatus,
+    setTokenCreatedAt,
     getAgentSettings,
     updateAgentSettings,
     changeAgentPassword

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import * as api from '../services/api';
+import PasswordInput from './PasswordInput';
 
 /**
  * LoginPage — Authenticates users against the backend.
@@ -67,17 +68,14 @@ export default function LoginPage({ onLogin }) {
                                 autoFocus
                             />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="Enter password"
-                                className="input-field"
-                                required
-                            />
-                        </div>
+                        <PasswordInput
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Enter password"
+                            label="Password"
+                            required
+                            disabled={loading}
+                        />
                         <button
                             type="submit"
                             disabled={loading}
@@ -92,12 +90,6 @@ export default function LoginPage({ onLogin }) {
                             {loading ? 'Signing in…' : 'Sign In'}
                         </button>
                     </form>
-
-                    <div className="mt-6 pt-6 border-t border-gray-100 text-center">
-                        <p className="text-xs text-gray-400">
-                            Demo: <span className="font-mono text-gray-500">admin@leadbridge.com</span> / <span className="font-mono text-gray-500">admin123</span>
-                        </p>
-                    </div>
                 </div>
             </div>
         </div>

@@ -4,6 +4,8 @@ const {
     getGlobalSettings,
     updateGlobalSettings,
     changeAdminPassword,
+    getTokenStatus,
+    setTokenCreatedAt,
     getAgentSettings,
     updateAgentSettings,
     changeAgentPassword
@@ -13,6 +15,10 @@ const {
 router.get('/', getGlobalSettings);
 router.put('/', updateGlobalSettings);
 router.put('/password', changeAdminPassword);
+
+// ── Facebook Token Status ──
+router.get('/token-status', getTokenStatus);
+router.put('/token-created-at', setTokenCreatedAt);
 
 // ── Agent settings (uses tempAuth from agentRoutes pattern) ──
 function tempAuth(req, res, next) {

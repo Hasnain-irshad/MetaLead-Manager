@@ -78,6 +78,11 @@ export async function updateForm(formId, data) {
   return res.data;
 }
 
+export async function deleteForm(formId) {
+  const res = await axios.delete(`${API_BASE}/api/forms/${formId}`);
+  return res.data;
+}
+
 export async function patchAdminLeadExtraFields(leadId, updates) {
   const res = await axios.patch(`${API_BASE}/api/admin/leads/${leadId}/extra-fields`, { updates });
   return res.data;
@@ -263,8 +268,11 @@ export async function updateGlobalSettings(data) {
   return res.data;
 }
 
-export async function changeAdminPassword(email, oldPassword, newPassword) {
-  const res = await axios.put(`${API_BASE}/api/settings/password`, { email, oldPassword, newPassword });
+export async function changeAdminPassword(email, oldPassword, newPassword, newEmail, newName) {
+  const payload = { email, oldPassword, newPassword };
+  if (newEmail !== undefined) payload.newEmail = newEmail;
+  if (newName !== undefined) payload.newName = newName;
+  const res = await axios.put(`${API_BASE}/api/settings/password`, payload);
   return res.data;
 }
 
@@ -287,5 +295,16 @@ export async function changeAgentPassword(userId, oldPassword, newPassword) {
   const res = await axios.put(`${API_BASE}/api/settings/agent/password`, { oldPassword, newPassword }, {
     headers: { 'x-user-id': userId }
   });
+  return res.data;
+}
+
+// --- Token Status ---
+export async function fetchTokenStatus() {
+  const res = await axios.get(`${API_BASE}/api/settings/token-status`);
+  return res.data;
+}
+
+export async function setTokenCreatedAt(token_created_at) {
+  const res = await axios.put(`${API_BASE}/api/settings/token-created-at`, { token_created_at });
   return res.data;
 }

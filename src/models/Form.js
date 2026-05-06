@@ -28,6 +28,11 @@ const FormSchema = new mongoose.Schema(
             type: String,
             default: ''
         },
+        isDeleted: {
+            type: Boolean,
+            default: false,
+            index: true
+        },
         created_at: {
             type: Date,
             default: Date.now

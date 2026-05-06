@@ -5,6 +5,7 @@ import {
 import * as api from '../services/api';
 import LeadsTable from './LeadsTable';
 import LeadModal from './LeadModal';
+import TokenExpiryBanner from './TokenExpiryBanner';
 
 /* =========================================================
    Dashboard — Main page showing stats, chart, filters, and
@@ -136,6 +137,9 @@ export default function Dashboard({ onLogout }) {
                     </button>
                 </div>
             </nav>
+
+            {/* ===== Token Expiry Banner ===== */}
+            <TokenExpiryBanner />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
                 {/* ===== Stats Header ===== */}

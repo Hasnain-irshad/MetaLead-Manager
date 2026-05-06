@@ -8,6 +8,7 @@ export default function FormManagement({ onBack }) {
     const [message, setMessage] = useState(null);
     // Per-row local edit state so we save on blur, not on every keystroke.
     const [drafts, setDrafts] = useState({});
+    const [confirmDelete, setConfirmDelete] = useState(null);
 
     useEffect(() => {
         loadForms();
@@ -73,6 +74,19 @@ export default function FormManagement({ onBack }) {
         }
     }
 
+    async function handleDeleteForm(formId) {
+        try {
+            await api.deleteForm(formId);
+            setForms(forms.filter(f => f._id !== formId));
+            setConfirmDelete(null);
+            const formName = forms.find(f => f._id === formId)?.form_name || 'Form';
+            showMessage('success', `${formName} deleted successfully.`);
+        } catch (err) {
+            console.error('Failed to delete form:', err);
+            showMessage('error', 'Failed to delete form.');
+        }
+    }
+
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
             <div className="flex items-center gap-4 mb-8">
@@ -127,6 +141,7 @@ export default function FormManagement({ onBack }) {
                                     <th className="p-4">Form ID</th>
                                     <th className="p-4">Page ID</th>
                                     <th className="p-4 pr-6">Lead Type Mapping</th>
+                                    <th className="p-4 text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -152,6 +167,18 @@ export default function FormManagement({ onBack }) {
                                                 />
                                             </div>
                                         </td>
+                                        <td className="p-4 text-center">
+                                            <button
+                                                onClick={() => setConfirmDelete(form._id)}
+                                                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                title="Delete form"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                                Delete
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -159,6 +186,32 @@ export default function FormManagement({ onBack }) {
                     </div>
                 )}
             </div>
+
+            {/* Delete Confirmation Dialog */}
+            {confirmDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-modal p-6 max-w-sm animate-fade-in">
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Form?</h3>
+                        <p className="text-gray-600 text-sm mb-6">
+                            Are you sure you want to delete <span className="font-semibold">{forms.find(f => f._id === confirmDelete)?.form_name}</span>? This action cannot be undone.
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => setConfirmDelete(null)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => handleDeleteForm(confirmDelete)}
+                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

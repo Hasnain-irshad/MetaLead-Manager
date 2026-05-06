@@ -43,6 +43,12 @@ const GlobalSettingsSchema = new mongoose.Schema(
             type: String,
             enum: ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'],
             default: 'DD/MM/YYYY'
+        },
+
+        // ── Facebook Integration ──
+        token_created_at: {
+            type: Date,
+            description: 'Timestamp when Facebook PAGE_ACCESS_TOKEN was created. Tokens expire after ~60 days.'
         }
     },
     { timestamps: true }

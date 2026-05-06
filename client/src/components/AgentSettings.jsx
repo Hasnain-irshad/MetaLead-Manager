@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../services/api';
+import PasswordInput from './PasswordInput';
 
 export default function AgentSettings({ user, onBack }) {
     const [profile, setProfile] = useState({ name: '', email: '', workStatus: 'AVAILABLE' });
@@ -203,18 +204,27 @@ export default function AgentSettings({ user, onBack }) {
                 <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-6 space-y-6">
                     <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Change Password</h2>
 
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Current Password</label>
-                        <input type="password" value={oldPw} onChange={(e) => setOldPw(e.target.value)} placeholder="Enter current password" className="input-field w-full" />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">New Password</label>
-                        <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="Enter new password" className="input-field w-full" />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Confirm New Password</label>
-                        <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="Re-enter new password" className="input-field w-full" />
-                    </div>
+                    <PasswordInput
+                        value={oldPw}
+                        onChange={(e) => setOldPw(e.target.value)}
+                        placeholder="Enter current password"
+                        label="Current Password"
+                        disabled={saving}
+                    />
+                    <PasswordInput
+                        value={newPw}
+                        onChange={(e) => setNewPw(e.target.value)}
+                        placeholder="Enter new password"
+                        label="New Password"
+                        disabled={saving}
+                    />
+                    <PasswordInput
+                        value={confirmPw}
+                        onChange={(e) => setConfirmPw(e.target.value)}
+                        placeholder="Re-enter new password"
+                        label="Confirm New Password"
+                        disabled={saving}
+                    />
 
                     <button onClick={handleChangePassword} disabled={saving || !oldPw || !newPw} className="btn-primary w-full">
                         {saving ? 'Updating...' : 'Update Password'}

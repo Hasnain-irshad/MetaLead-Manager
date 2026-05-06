@@ -23,11 +23,11 @@ async function syncForms(req, res, next) {
 }
 
 /**
- * Fetch all forms from DB.
+ * Fetch all non-deleted forms from DB.
  */
 async function getForms(req, res, next) {
     try {
-        const forms = await Form.find().sort({ created_at: -1 });
+        const forms = await Form.find({ isDeleted: { $ne: true } }).sort({ created_at: -1 });
         return res.status(200).json({ forms });
     } catch (err) {
         next(err);
@@ -76,8 +76,36 @@ async function updateForm(req, res, next) {
     }
 }
 
+/**
+ * Soft delete a form by setting isDeleted flag.
+ * GET /api/forms/:id/delete
+ */
+async function deleteForm(req, res, next) {
+    try {
+        const { id } = req.params;
+        
+        const form = await Form.findById(id);
+        if (!form) {
+            return res.status(404).json({ error: 'Form not found' });
+        }
+
+        if (form.isDeleted) {
+            return res.status(400).json({ error: 'Form is already deleted' });
+        }
+
+        form.isDeleted = true;
+        await form.save();
+
+        console.info(`[formController][deleteForm] Form ${form.form_name} (${form.form_id}) marked as deleted`);
+        return res.status(200).json({ success: true, message: 'Form deleted successfully' });
+    } catch (err) {
+        next(err);
+    }
+}
+
 module.exports = {
     syncForms,
     getForms,
-    updateForm
+    updateForm,
+    deleteForm
 };

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../services/api';
+import PasswordInput from './PasswordInput';
 
-const TABS = ['Lead Settings', 'Agent Settings', 'Security', 'System'];
+const TABS = ['Lead Settings', 'Agent Settings', 'Security', 'System', 'Facebook'];
 
 export default function AdminSettings({ user, onBack }) {
     const [activeTab, setActiveTab] = useState(0);
@@ -14,9 +15,22 @@ export default function AdminSettings({ user, onBack }) {
     const [oldPw, setOldPw] = useState('');
     const [newPw, setNewPw] = useState('');
     const [confirmPw, setConfirmPw] = useState('');
+    const [newEmail, setNewEmail] = useState('');
+    const [displayName, setDisplayName] = useState('');
+
+    // Facebook tab state
+    const [tokenDate, setTokenDate] = useState('');
+    const [tokenStatus, setTokenStatus] = useState(null);
+    const [checkingToken, setCheckingToken] = useState(false);
 
     useEffect(() => {
         loadSettings();
+        checkTokenStatus();
+        // Prefill editable fields with current user values
+        if (user) {
+            setNewEmail(user.email || '');
+            setDisplayName(user.name || '');
+        }
     }, []);
 
     async function loadSettings() {
@@ -24,10 +38,42 @@ export default function AdminSettings({ user, onBack }) {
         try {
             const data = await api.fetchGlobalSettings();
             setSettings(data);
+            if (data.token_created_at) {
+                const date = new Date(data.token_created_at).toISOString().split('T')[0];
+                setTokenDate(date);
+            }
         } catch (err) {
             console.error('Failed to load settings:', err);
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function checkTokenStatus() {
+        setCheckingToken(true);
+        try {
+            const status = await api.fetchTokenStatus();
+            setTokenStatus(status);
+        } catch (err) {
+            console.error('Failed to check token status:', err);
+        } finally {
+            setCheckingToken(false);
+        }
+    }
+
+    async function handleSetTokenCreatedAt() {
+        setSaving(true);
+        setMsg({ text: '', type: '' });
+        try {
+            const date = tokenDate ? new Date(tokenDate) : new Date();
+            await api.setTokenCreatedAt(date.toISOString());
+            setMsg({ text: 'Token creation date updated!', type: 'success' });
+            await checkTokenStatus();
+        } catch (err) {
+            setMsg({ text: err.response?.data?.error || 'Failed to update token date', type: 'error' });
+        } finally {
+            setSaving(false);
+            setTimeout(() => setMsg({ text: '', type: '' }), 3000);
         }
     }
 
@@ -62,8 +108,18 @@ export default function AdminSettings({ user, onBack }) {
         setSaving(true);
         setMsg({ text: '', type: '' });
         try {
-            await api.changeAdminPassword(user.email, oldPw, newPw);
-            setMsg({ text: 'Password changed successfully!', type: 'success' });
+            const res = await api.changeAdminPassword(user.email, oldPw, newPw, newEmail, displayName);
+            if (res && res.user) {
+                // Persist updated user and refresh app so header reflects new name/email
+                try {
+                    localStorage.setItem('leadbridge_user_v2', JSON.stringify(res.user));
+                } catch (e) {}
+                setMsg({ text: 'Password and profile updated successfully!', type: 'success' });
+                // reload to propagate user change to parent App component
+                setTimeout(() => window.location.reload(), 700);
+            } else {
+                setMsg({ text: res?.message || 'Password changed successfully!', type: 'success' });
+            }
             setOldPw(''); setNewPw(''); setConfirmPw('');
         } catch (err) {
             setMsg({ text: err.response?.data?.error || 'Failed to change password', type: 'error' });
@@ -225,18 +281,35 @@ export default function AdminSettings({ user, onBack }) {
                 <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-6 space-y-6">
                     <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Change Admin Password</h2>
 
+                    <PasswordInput
+                        value={oldPw}
+                        onChange={(e) => setOldPw(e.target.value)}
+                        placeholder="Enter current password"
+                        label="Current Password"
+                        disabled={saving}
+                    />
                     <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Current Password</label>
-                        <input type="password" value={oldPw} onChange={(e) => setOldPw(e.target.value)} placeholder="Enter current password" className="input-field w-full" />
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Display Name</label>
+                        <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Admin name to display" className="input-field w-full" disabled={saving} />
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">New Password</label>
-                        <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="Enter new password" className="input-field w-full" />
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Change Email (optional)</label>
+                        <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="admin@yourdomain.com" className="input-field w-full" disabled={saving} />
                     </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Confirm New Password</label>
-                        <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="Re-enter new password" className="input-field w-full" />
-                    </div>
+                    <PasswordInput
+                        value={newPw}
+                        onChange={(e) => setNewPw(e.target.value)}
+                        placeholder="Enter new password"
+                        label="New Password"
+                        disabled={saving}
+                    />
+                    <PasswordInput
+                        value={confirmPw}
+                        onChange={(e) => setConfirmPw(e.target.value)}
+                        placeholder="Re-enter new password"
+                        label="Confirm New Password"
+                        disabled={saving}
+                    />
 
                     <button onClick={handleChangePassword} disabled={saving || !oldPw || !newPw} className="btn-primary w-full">
                         {saving ? 'Updating...' : 'Update Password'}
@@ -274,6 +347,78 @@ export default function AdminSettings({ user, onBack }) {
                     <button onClick={handleSaveSettings} disabled={saving} className="btn-primary w-full">
                         {saving ? 'Saving...' : 'Save System Settings'}
                     </button>
+                </div>
+            )}
+
+            {/* ── Tab 4: Facebook Integration ── */}
+            {activeTab === 4 && (
+                <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-6 space-y-6">
+                    <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Facebook Token Management</h2>
+                    <p className="text-sm text-gray-600">Facebook PAGE_ACCESS_TOKEN expires after approximately 60 days. Track when your token was created to know when renewal is needed.</p>
+
+                    {/* Token Status Display */}
+                    {tokenStatus && (
+                        <div className={`p-4 rounded-xl border ${
+                            tokenStatus.isExpired
+                                ? 'bg-red-50 border-red-200 text-red-700'
+                                : tokenStatus.isExpiringSoon
+                                ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                : 'bg-green-50 border-green-200 text-green-700'
+                        }`}>
+                            <p className="font-semibold text-sm mb-1">
+                                {tokenStatus.isExpired
+                                    ? 'Token Expired'
+                                    : tokenStatus.isExpiringSoon
+                                    ? `Token Expiring Soon: ${tokenStatus.daysRemaining} day${tokenStatus.daysRemaining === 1 ? '' : 's'} remaining`
+                                    : `Token Active: ${tokenStatus.daysRemaining} day${tokenStatus.daysRemaining === 1 ? '' : 's'} remaining`}
+                            </p>
+                            {tokenStatus.tokenCreatedAt && (
+                                <p className="text-xs opacity-80">Created: {new Date(tokenStatus.tokenCreatedAt).toLocaleDateString()}</p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Token Date Input */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Token Creation Date</label>
+                        <input
+                            type="date"
+                            value={tokenDate}
+                            onChange={(e) => setTokenDate(e.target.value)}
+                            className="input-field w-full"
+                            disabled={saving || checkingToken}
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Enter the date when the Facebook token was created. Leave empty to set to today.</p>
+                    </div>
+
+                    <div className="flex gap-3">
+                        <button
+                            onClick={handleSetTokenCreatedAt}
+                            disabled={saving || checkingToken}
+                            className="flex-1 btn-primary"
+                        >
+                            {saving ? 'Updating...' : 'Update Token Date'}
+                        </button>
+                        <button
+                            onClick={checkTokenStatus}
+                            disabled={checkingToken}
+                            className="flex-1 btn-secondary"
+                        >
+                            {checkingToken ? 'Checking...' : 'Check Status'}
+                        </button>
+                    </div>
+
+                    <div className="pt-4 border-t border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-3">How to renew your token:</h3>
+                        <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
+                            <li>Go to Facebook Developers dashboard</li>
+                            <li>Navigate to your App Settings</li>
+                            <li>Find the PAGE_ACCESS_TOKEN in Messenger Platform settings</li>
+                            <li>Generate a new token if needed</li>
+                            <li>Update your PAGE_ACCESS_TOKEN in environment variables</li>
+                            <li>Update the token creation date above to today's date</li>
+                        </ol>
+                    </div>
                 </div>
             )}
         </div>
