@@ -158,10 +158,36 @@ export async function deleteAgent(agentId) {
 }
 
 export function downloadLeadsExport(role, userId) {
+  // Trigger a proper file download using XHR so the browser saves the file
+  // instead of just opening a new tab. Handles optional agent userId.
   const url = role === 'admin'
     ? `${API_BASE}/api/admin/leads/export`
-    : `${API_BASE}/api/agent/leads/export?userId=${userId}`;
-  window.open(url, '_blank');
+    : `${API_BASE}/api/agent/leads/export${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`;
+
+  return axios.get(url, { responseType: 'blob', withCredentials: true })
+    .then(res => {
+      const disposition = res.headers['content-disposition'] || res.headers['Content-Disposition'];
+      let filename = 'leads.csv';
+      if (disposition) {
+        const match = disposition.match(/filename\*=UTF-8''([^;\n\r]+)/) || disposition.match(/filename="?([^";]+)"?/);
+        if (match) filename = decodeURIComponent(match[1]);
+      }
+
+      const blob = new Blob([res.data], { type: res.data.type || 'text/csv' });
+      const link = document.createElement('a');
+      const urlObj = window.URL.createObjectURL(blob);
+      link.href = urlObj;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(urlObj);
+      return { success: true };
+    })
+    .catch(err => {
+      console.error('[api][downloadLeadsExport] Error downloading:', err);
+      throw err;
+    });
 }
 
 // --- Agent APIs ---

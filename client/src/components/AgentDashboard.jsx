@@ -17,6 +17,17 @@ const STATUS_COLORS = {
     other: '#9ca3af',          // gray-400
 };
 
+const DISPLAY_LABEL = {
+    new: 'New',
+    contacted: 'Contacted',
+    interested: 'Interested',
+    not_interested: 'Not Interested',
+    follow_up: 'Follow Up',
+    admission_done: 'Done',
+    other: 'Other',
+    not_connected: 'Not Connected'
+};
+
 export default function AgentDashboard({ user, onLogout }) {
     const [leads, setLeads] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -93,6 +104,7 @@ export default function AgentDashboard({ user, onLogout }) {
         { name: 'Follow Up', value: stats.follow_up, color: STATUS_COLORS.follow_up },
         { name: 'Done', value: stats.closed, color: STATUS_COLORS.admission_done },
         { name: 'Other', value: stats.other, color: STATUS_COLORS.other },
+        { name: 'Not Connected', value: stats.not_connected || 0, color: STATUS_COLORS.not_connected },
     ];
 
     return (
@@ -179,13 +191,13 @@ export default function AgentDashboard({ user, onLogout }) {
                             </button>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            {['', 'new', 'contacted', 'interested', 'not_interested', 'follow_up', 'admission_done', 'other'].map(st => (
+                            {['', 'new', 'contacted', 'interested', 'not_interested', 'follow_up', 'admission_done', 'other', 'not_connected'].map(st => (
                                 <button
                                     key={st}
                                     onClick={() => setStatusFilter(st)}
                                     className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full transition-all border ${statusFilter === st ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'}`}
                                 >
-                                    {st || 'All'}
+                                    {st ? (DISPLAY_LABEL?.[st] || st.replace(/_/g, ' ')) : 'All'}
                                 </button>
                             ))}
                         </div>
@@ -199,7 +211,7 @@ export default function AgentDashboard({ user, onLogout }) {
                                 <p className="text-gray-400 text-sm">No leads match your current filter.</p>
                             </div>
                         ) : (
-                            <LeadsTable leads={leads} onOpen={setSelected} showAgent={false} />
+                            <LeadsTable leads={leads} onOpen={setSelected} showAgent={false} startIndex={0} />
                         )}
                     </div>
                 </div>

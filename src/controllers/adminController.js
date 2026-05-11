@@ -86,6 +86,7 @@ async function getStats(req, res) {
             follow_up_leads,
             admission_done,
             other_leads,
+            not_connected_leads,
             unassigned_leads
         ] = await Promise.all([
             Lead.countDocuments(),
@@ -96,6 +97,7 @@ async function getStats(req, res) {
             Lead.countDocuments({ status: 'follow_up' }),
             Lead.countDocuments({ status: 'admission_done' }),
             Lead.countDocuments({ status: 'other' }),
+            Lead.countDocuments({ status: 'not_connected' }),
             Lead.countDocuments({ $or: [{ assigned_agent: null }, { assigned_agent: { $exists: false } }] })
         ]);
         const assigned_leads = total_leads - unassigned_leads;
@@ -109,6 +111,7 @@ async function getStats(req, res) {
             follow_up_leads,
             admission_done,
             other_leads,
+            not_connected_leads,
             unassigned_leads,
             assigned_leads
         });
@@ -353,22 +356,56 @@ async function exportLeads(req, res) {
     try {
         const leads = await Lead.find({})
             .populate('assigned_agent', 'name email')
+            .populate('comments.added_by', 'name email')
             .sort({ createdAt: -1 });
 
-        let csv = 'Lead ID,Full Name,Email,Phone,Status,Form Name,Lead Type,Assigned Agent,Created At\n';
+        // Collect all extra_fields keys across leads so we can include them as columns
+        const extraKeysSet = new Set();
+        leads.forEach(l => {
+            if (l.extra_fields && typeof l.extra_fields === 'object') {
+                Object.keys(l.extra_fields).forEach(k => extraKeysSet.add(k));
+            }
+        });
+        const extraKeys = Array.from(extraKeysSet);
+
+        const baseCols = ['Lead ID','Full Name','Email','Phone','Status','Form Name','Lead Type','Assigned Agent Name','Assigned Agent Email','Created At'];
+        const header = baseCols.concat(extraKeys).concat(['Comments']);
+
+        function esc(v) {
+            if (v === null || v === undefined) return '""';
+            const s = String(v).replace(/\r?\n/g, ' ');
+            return `"${s.replace(/"/g, '""')}"`;
+        }
+
+        let csv = header.join(',') + '\n';
 
         leads.forEach(l => {
-            const row = [
-                `"${l.leadId || ''}"`,
-                `"${l.full_name || ''}"`,
-                `"${l.email || ''}"`,
-                `"${l.phone_number || ''}"`,
-                `"${l.status || ''}"`,
-                `"${l.form_name || ''}"`,
-                `"${l.lead_type || ''}"`,
-                `"${l.assigned_agent ? l.assigned_agent.name : 'UNASSIGNED'}"`,
-                `"${l.createdAt ? l.createdAt.toISOString() : ''}"`
-            ];
+            const row = [];
+            row.push(esc(l.leadId || ''));
+            row.push(esc(l.full_name || ''));
+            row.push(esc(l.email || ''));
+            row.push(esc(l.phone_number || ''));
+            row.push(esc(l.status || ''));
+            row.push(esc(l.form_name || ''));
+            row.push(esc(l.lead_type || ''));
+            row.push(esc(l.assigned_agent ? l.assigned_agent.name : ''));
+            row.push(esc(l.assigned_agent ? l.assigned_agent.email : ''));
+            row.push(esc(l.createdAt ? l.createdAt.toISOString() : ''));
+
+            // extra fields
+            extraKeys.forEach(k => {
+                const v = l.extra_fields && Object.prototype.hasOwnProperty.call(l.extra_fields, k) ? l.extra_fields[k] : '';
+                row.push(esc(v));
+            });
+
+            // comments: include timestamp, author name, and text joined by ' || '
+            const commentsText = (l.comments || []).map(c => {
+                const when = c.created_at ? new Date(c.created_at).toISOString() : (c.date ? new Date(c.date).toISOString() : '');
+                const who = c.added_by ? (c.added_by.name || c.added_by.email || '') : '';
+                return `${when} ${who}: ${c.text || ''}`.trim();
+            }).join(' || ');
+            row.push(esc(commentsText));
+
             csv += row.join(',') + '\n';
         });
 
@@ -418,10 +455,15 @@ async function updateLeadStatus(req, res) {
             return res.status(400).json({ error: 'Status is required' });
         }
 
+        const validStatuses = ['new', 'contacted', 'interested', 'not_interested', 'follow_up', 'admission_done', 'other', 'not_connected'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+        }
+
         const lead = await Lead.findByIdAndUpdate(
             req.params.id,
             { status },
-            { new: true }
+            { new: true, runValidators: true }
         ).populate('assigned_agent', 'name email');
 
         if (!lead) {

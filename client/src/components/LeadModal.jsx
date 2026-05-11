@@ -15,6 +15,7 @@ const STATUS_OPTIONS = [
   { value: 'follow_up', label: 'Follow Up' },
   { value: 'admission_done', label: 'Admission Done' },
   { value: 'other', label: 'Other' }
+  ,{ value: 'not_connected', label: 'Not Connected' }
 ];
 
 // Top-level columns on the Lead document — looked up directly instead of

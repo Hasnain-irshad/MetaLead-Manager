@@ -22,6 +22,18 @@ const BADGE_MAP = {
   follow_up: 'badge-warning',
   admission_done: 'badge-success',
   other: 'badge-other',
+  not_connected: 'badge-other',
+};
+
+const DISPLAY_LABEL = {
+  new: 'New',
+  contacted: 'Contacted',
+  interested: 'Interested',
+  not_interested: 'Not Interested',
+  follow_up: 'Follow Up',
+  admission_done: 'Done',
+  other: 'Other',
+  not_connected: 'Not Connected'
 };
 
 // Map lead types to friendly labels or icons if needed
@@ -32,7 +44,7 @@ const LEAD_TYPE_LABELS = {
   career_counselling: 'Counselling',
 };
 
-export default function LeadsTable({ leads, onOpen, onDelete, onSelect, selectedIds = new Set(), showAgent }) {
+export default function LeadsTable({ leads, onOpen, onDelete, onSelect, selectedIds = new Set(), showAgent, startIndex = 0 }) {
   const handleSelectAll = (e) => {
     if (!onSelect) return; // Skip if no selection handler
     
@@ -60,7 +72,7 @@ export default function LeadsTable({ leads, onOpen, onDelete, onSelect, selected
     <div className="overflow-x-auto">
       <table className="data-table">
         <thead>
-          <tr>
+            <tr>
             {onSelect && (
               <th className="w-8">
                 <input
@@ -72,6 +84,7 @@ export default function LeadsTable({ leads, onOpen, onDelete, onSelect, selected
                 />
               </th>
             )}
+            <th className="w-12 text-left">#</th>
             <th>Full Name</th>
             <th>Email</th>
             <th>Type</th>
@@ -83,7 +96,7 @@ export default function LeadsTable({ leads, onOpen, onDelete, onSelect, selected
           </tr>
         </thead>
         <tbody>
-          {leads.map((lead) => (
+          {leads.map((lead, idx) => (
             <tr key={lead._id} className={`hover:bg-gray-50/50 transition-colors ${onSelect && selectedIds?.has(lead._id) ? 'bg-blue-50' : ''}`}>
               {onSelect && (
                 <td className="w-8 text-center">
@@ -95,6 +108,7 @@ export default function LeadsTable({ leads, onOpen, onDelete, onSelect, selected
                   />
                 </td>
               )}
+              <td className="w-12 text-sm text-gray-600 text-left">{startIndex + idx + 1}</td>
               <td className="font-medium text-gray-900">
                 <div className="max-w-[150px] truncate" title={lead.full_name}>
                   {lead.full_name || '—'}
@@ -123,7 +137,7 @@ export default function LeadsTable({ leads, onOpen, onDelete, onSelect, selected
               </td>
               <td>
                 <span className={`badge ${BADGE_MAP[lead.status] || 'badge-pending'}`}>
-                  {(lead.status || 'new').replace('_', ' ')}
+                  {DISPLAY_LABEL[lead.status] || (lead.status || 'new').replace(/_/g, ' ')}
                 </span>
               </td>
               <td className="text-right">

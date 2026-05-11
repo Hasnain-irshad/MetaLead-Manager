@@ -21,6 +21,7 @@ const STATUS_COLORS = {
     follow_up: '#f59e0b',    // warning
     admission_done: '#8b5cf6', // purple-500
     other: '#9ca3af',          // gray-400
+    not_connected: '#9ca3af'
 };
 
 export default function AdminDashboard({ user, onLogout }) {
@@ -52,6 +53,10 @@ export default function AdminDashboard({ user, onLogout }) {
 
     // Known lead types (for filter dropdown), pulled from forms + form configs.
     const [knownLeadTypes, setKnownLeadTypes] = useState([]);
+    // Pagination
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(20);
+    const [pagination, setPagination] = useState({ total: 0, totalPages: 0 });
 
     // Agent picker for "Assign Selected To Agent"
     const [pickAgentId, setPickAgentId] = useState('');
@@ -66,12 +71,15 @@ export default function AdminDashboard({ user, onLogout }) {
                     status: statusFilter,
                     form_id: formFilter,
                     lead_type: leadTypeFilter,
-                    assignment: assignmentScope
+                    assignment: assignmentScope,
+                    page,
+                    limit
                 }),
                 api.fetchAdminStats(),
                 api.fetchAdminAgents()
             ]);
             setLeads(leadsRes.leads || []);
+            setPagination(leadsRes.pagination || { total: 0, page: 1, limit, totalPages: 0 });
             setStats(statsRes || {});
             setAgents(agentsRes.agents || []);
             // Only clear selections on explicit refresh — a silent poll
@@ -82,7 +90,12 @@ export default function AdminDashboard({ user, onLogout }) {
         } finally {
             if (!silent) setLoading(false);
         }
-    }, [search, statusFilter, formFilter, leadTypeFilter, assignmentScope]);
+    }, [search, statusFilter, formFilter, leadTypeFilter, assignmentScope, page, limit]);
+
+    // Reload when page or limit change
+    useEffect(() => {
+        loadData();
+    }, [page, limit]);
 
     useEffect(() => {
         loadData();
@@ -328,6 +341,7 @@ export default function AdminDashboard({ user, onLogout }) {
         { name: 'Follow Up', value: stats.follow_up_leads || 0, color: STATUS_COLORS.follow_up },
         { name: 'Done', value: stats.admission_done || 0, color: STATUS_COLORS.admission_done },
         { name: 'Other', value: stats.other_leads || 0, color: STATUS_COLORS.other },
+            { name: 'Not Connected', value: stats.not_connected_leads || 0, color: STATUS_COLORS.not_connected },
     ];
 
     return (
@@ -598,6 +612,44 @@ export default function AdminDashboard({ user, onLogout }) {
                                 </svg>
                                 Download CSV
                             </button>
+                                <button
+                                    onClick={() => {
+                                        // Download only the currently visible leads (current page + filters)
+                                        try {
+                                            const rows = leads || [];
+                                            let csv = 'Lead ID,Full Name,Email,Phone,Status,Form Name,Lead Type,Assigned Agent,Created At\n';
+                                            rows.forEach(l => {
+                                                const row = [
+                                                    `"${l.leadId || ''}"`,
+                                                    `"${l.full_name || ''}"`,
+                                                    `"${l.email || ''}"`,
+                                                    `"${l.phone_number || ''}"`,
+                                                    `"${l.status || ''}"`,
+                                                    `"${l.form_name || ''}"`,
+                                                    `"${l.lead_type || ''}"`,
+                                                    `"${l.assigned_agent ? l.assigned_agent.name : 'UNASSIGNED'}"`,
+                                                    `"${l.createdAt ? new Date(l.createdAt).toISOString() : ''}"`
+                                                ];
+                                                csv += row.join(',') + '\n';
+                                            });
+                                            const blob = new Blob([csv], { type: 'text/csv' });
+                                            const urlObj = window.URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = urlObj;
+                                            a.setAttribute('download', `leads_page_${page}.csv`);
+                                            document.body.appendChild(a);
+                                            a.click();
+                                            a.remove();
+                                            window.URL.revokeObjectURL(urlObj);
+                                        } catch (err) {
+                                            console.error('Download visible leads failed:', err);
+                                            alert('Failed to download visible leads');
+                                        }
+                                    }}
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-800 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all shadow-sm"
+                                >
+                                    Download Visible
+                                </button>
                             <button
                                 onClick={() => setShowImportModal(true)}
                                 className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-md"
@@ -695,6 +747,7 @@ export default function AdminDashboard({ user, onLogout }) {
                                 <option value="follow_up">Follow Up</option>
                                 <option value="admission_done">Done</option>
                                 <option value="other">Other</option>
+                                <option value="not_connected">Not Connected</option>
                             </select>
                             <select value={leadTypeFilter} onChange={e => setLeadTypeFilter(e.target.value)} className="input-field w-auto min-w-[140px]">
                                 <option value="">All Lead Types</option>
@@ -734,9 +787,43 @@ export default function AdminDashboard({ user, onLogout }) {
                                 onDelete={handleDeleteLead}
                                 onSelect={handleSelectLead}
                                 selectedIds={selectedLeadIds}
-                                showAgent={true} 
+                                showAgent={true}
+                                startIndex={(page - 1) * limit}
                             />
                         )}
+                    </div>
+                    {/* Pagination controls */}
+                    <div className="flex items-center justify-between mt-3">
+                        <div className="text-sm text-gray-600">
+                            {pagination && pagination.total ? (
+                                (() => {
+                                    const start = (page - 1) * limit + 1;
+                                    const end = start + (leads.length || 0) - 1;
+                                    return `Showing ${start}-${end} of ${pagination.total} leads`;
+                                })()
+                            ) : (
+                                `Showing ${leads.length} leads`
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                                disabled={page <= 1}
+                                className="px-3 py-1 bg-white border rounded disabled:opacity-50"
+                            >Prev</button>
+                            <span className="text-sm text-gray-600 px-2">Page {page}{pagination.totalPages ? ` / ${pagination.totalPages}` : ''}</span>
+                            <button
+                                onClick={() => setPage(p => Math.min(pagination.totalPages || p + 1, p + 1))}
+                                disabled={pagination.totalPages ? page >= pagination.totalPages : leads.length < limit}
+                                className="px-3 py-1 bg-white border rounded disabled:opacity-50"
+                            >Next</button>
+                            <select value={limit} onChange={e => { setLimit(parseInt(e.target.value, 10)); setPage(1); }} className="input-field text-sm">
+                                <option value={10}>10 / page</option>
+                                <option value={20}>20 / page</option>
+                                <option value={50}>50 / page</option>
+                                <option value={100}>100 / page</option>
+                            </select>
+                        </div>
                     </div>
                 </section>
 

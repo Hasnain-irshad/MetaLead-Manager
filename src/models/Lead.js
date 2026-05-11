@@ -57,7 +57,8 @@ const LeadSchema = new mongoose.Schema(
         'not_interested',
         'follow_up',
         'admission_done',
-        'other'
+        'other',
+        'not_connected'
       ],
       default: 'new'
     },

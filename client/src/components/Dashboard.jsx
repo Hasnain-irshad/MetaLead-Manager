@@ -12,12 +12,27 @@ import TokenExpiryBanner from './TokenExpiryBanner';
    a leads table with modal for editing/viewing lead details.
    ========================================================= */
 
-// Color map for status badges and chart bars
+// Color map for status badges and chart bars (DB keys)
 const STATUS_COLORS = {
-    Pending: '#f59e0b',
-    Contacted: '#3b82f6',
-    Interested: '#10b981',
-    'Not Interested': '#ef4444',
+    new: '#f59e0b',
+    contacted: '#3b82f6',
+    interested: '#10b981',
+    not_interested: '#ef4444',
+    follow_up: '#f59e0b',
+    admission_done: '#8b5cf6',
+    other: '#9ca3af',
+    not_connected: '#9ca3af'
+};
+
+const DISPLAY_LABEL = {
+    new: 'New',
+    contacted: 'Contacted',
+    interested: 'Interested',
+    not_interested: 'Not Interested',
+    follow_up: 'Follow Up',
+    admission_done: 'Done',
+    other: 'Other',
+    not_connected: 'Not Connected'
 };
 
 export default function Dashboard({ onLogout }) {
@@ -84,9 +99,9 @@ export default function Dashboard({ onLogout }) {
     ).length;
 
     // Chart data from stats.counts
-    const chartData = Object.entries(STATUS_COLORS).map(([name, color]) => ({
-        name,
-        value: stats.counts?.[name] || 0,
+    const chartData = Object.entries(STATUS_COLORS).map(([key, color]) => ({
+        name: DISPLAY_LABEL[key] || key,
+        value: stats.counts?.[key] || 0,
         color,
     }));
 
@@ -252,10 +267,15 @@ export default function Dashboard({ onLogout }) {
                             className="input-field sm:w-44"
                         >
                             <option value="All">All Statuses</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Contacted">Contacted</option>
-                            <option value="Interested">Interested</option>
-                            <option value="Not Interested">Not Interested</option>
+                            <option value="">All</option>
+                            <option value="new">New</option>
+                            <option value="contacted">Contacted</option>
+                            <option value="interested">Interested</option>
+                            <option value="not_interested">Not Interested</option>
+                            <option value="follow_up">Follow Up</option>
+                            <option value="admission_done">Done</option>
+                            <option value="other">Other</option>
+                            <option value="not_connected">Not Connected</option>
                         </select>
 
                         {/* Date from */}
@@ -307,7 +327,7 @@ export default function Dashboard({ onLogout }) {
                             <p className="text-xs text-gray-300 mt-1">Try adjusting your filters</p>
                         </div>
                     ) : (
-                        <LeadsTable leads={filtered} onOpen={(lead) => setSelected(lead)} />
+                        <LeadsTable leads={filtered} onOpen={(lead) => setSelected(lead)} startIndex={0} />
                     )}
                 </div>
 

@@ -21,6 +21,7 @@ const UserSchema = new mongoose.Schema(
       type: String,
       required: true
     },
+    
     role: {
       type: String,
       enum: ['admin', 'agent'],
@@ -51,12 +52,14 @@ const UserSchema = new mongoose.Schema(
  * Skips if the value is already a bcrypt hash (starts with $2).
  */
 UserSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  // Don't re-hash an already hashed value
-  if (this.password.startsWith('$2')) return next();
   try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
+    // Primary password hashing
+    if (this.isModified('password')) {
+      if (!this.password.startsWith('$2')) {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+      }
+    }
     next();
   } catch (err) {
     next(err);
